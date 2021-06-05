@@ -261,8 +261,11 @@ func LoadConfig(filename string) (Config, error) {
 }
 
 func main() {
-	var configFilename string
-	flag.StringVar(&configFilename, "config", "config.yml", "config file")
+	configFilename := os.Getenv("DYNDUC_CONFIG_FILE")
+	if configFilename == "" {
+		configFilename = "config.yml"
+	}
+	flag.StringVar(&configFilename, "config", configFilename, "config file")
 	flag.Parse()
 
 	log.Printf("Reading %s\n", configFilename)
