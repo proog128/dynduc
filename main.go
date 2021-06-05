@@ -17,7 +17,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func PostIGDGetIPRequest(url string, command string) ([]byte, error) {
+func postIGDGetIPRequest(url string, command string) ([]byte, error) {
 	data := `<?xml version='1.0' encoding='utf-8'?>
 <s:Envelope s:encodingStyle='http://schemas.xmlsoap.org/soap/encoding/' xmlns:s='http://schemas.xmlsoap.org/soap/envelope/'>
 	<s:Body>
@@ -43,8 +43,8 @@ func PostIGDGetIPRequest(url string, command string) ([]byte, error) {
 	return body, nil
 }
 
-func GetExternalIPv4FromIGD(url string) (string, error) {
-	response, err := PostIGDGetIPRequest(url, "GetExternalIPAddress")
+func getExternalIPv4FromIGD(url string) (string, error) {
+	response, err := postIGDGetIPRequest(url, "GetExternalIPAddress")
 	if err != nil {
 		return "", err
 	}
@@ -66,8 +66,8 @@ func GetExternalIPv4FromIGD(url string) (string, error) {
 	return r.NewExternalIPAddress, nil
 }
 
-func GetExternalIPv6FromIGD(url string) (string, error) {
-	response, err := PostIGDGetIPRequest(url, "X_AVM_DE_GetExternalIPv6Address")
+func getExternalIPv6FromIGD(url string) (string, error) {
+	response, err := postIGDGetIPRequest(url, "X_AVM_DE_GetExternalIPv6Address")
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +89,7 @@ func GetExternalIPv6FromIGD(url string) (string, error) {
 	return r.NewExternalIPv6Address, nil
 }
 
-func ListDeviceIPs(deviceName string, family int) ([]netlink.Addr, error) {
+func listDeviceIPs(deviceName string, family int) ([]netlink.Addr, error) {
 	device, err := netlink.LinkByName(deviceName)
 	if err != nil {
 		return nil, err
@@ -101,8 +101,8 @@ func ListDeviceIPs(deviceName string, family int) ([]netlink.Addr, error) {
 	return addrList, nil
 }
 
-func GetExternalIPv4FromDevice(deviceName string) (string, error) {
-	addrList, err := ListDeviceIPs(deviceName, netlink.FAMILY_V4)
+func getExternalIPv4FromDevice(deviceName string) (string, error) {
+	addrList, err := listDeviceIPs(deviceName, netlink.FAMILY_V4)
 	if err != nil {
 		return "", err
 	}
@@ -118,8 +118,8 @@ func GetExternalIPv4FromDevice(deviceName string) (string, error) {
 	return "", fmt.Errorf("no public IPv4 address found on device %s", deviceName)
 }
 
-func GetExternalIPv6FromDevice(deviceName string) (string, error) {
-	addrList, err := ListDeviceIPs(deviceName, netlink.FAMILY_V6)
+func getExternalIPv6FromDevice(deviceName string) (string, error) {
+	addrList, err := listDeviceIPs(deviceName, netlink.FAMILY_V6)
 	if len(addrList) == 0 {
 		return "", err
 	}
@@ -155,7 +155,7 @@ type Addresses struct {
 	ip6 string
 }
 
-func SendUpdate(srv Server, addr Addresses) error {
+func sendUpdate(srv Server, addr Addresses) error {
 	url := srv.URL
 	url = strings.ReplaceAll(url, "<ipaddr>", addr.ip4)
 	url = strings.ReplaceAll(url, "<ip6addr>", addr.ip6)
@@ -189,17 +189,17 @@ func SendUpdate(srv Server, addr Addresses) error {
 	return nil
 }
 
-func Update(cfg Config, lastSyncedAddr []Addresses) bool {
+func update(cfg Config, lastSyncedAddr []Addresses) bool {
 	var err error
 
 	ip4 := ""
 	if cfg.IP4Provider == "igd" {
-		ip4, err = GetExternalIPv4FromIGD(cfg.IGDAddress)
+		ip4, err = getExternalIPv4FromIGD(cfg.IGDAddress)
 		if err != nil {
 			log.Println("Failed to retrieve IPv4 from IGD at", cfg.IGDAddress)
 		}
 	} else if cfg.IP4Provider == "dev" {
-		ip4, err = GetExternalIPv4FromDevice(cfg.DevName)
+		ip4, err = getExternalIPv4FromDevice(cfg.DevName)
 		if err != nil {
 			log.Println("Failed to retrieve IPv4 from device", cfg.DevName)
 		}
@@ -207,12 +207,12 @@ func Update(cfg Config, lastSyncedAddr []Addresses) bool {
 
 	ip6 := ""
 	if cfg.IP6Provider == "igd" {
-		ip6, err = GetExternalIPv6FromIGD(cfg.IGDAddress)
+		ip6, err = getExternalIPv6FromIGD(cfg.IGDAddress)
 		if err != nil {
 			log.Println("Failed to retrieve IPv6 from IGD at", cfg.IGDAddress)
 		}
 	} else if cfg.IP6Provider == "dev" {
-		ip6, err = GetExternalIPv6FromDevice(cfg.DevName)
+		ip6, err = getExternalIPv6FromDevice(cfg.DevName)
 		if err != nil {
 			log.Println("Failed to retrieve IPv6 from device", cfg.DevName)
 		}
@@ -229,7 +229,7 @@ func Update(cfg Config, lastSyncedAddr []Addresses) bool {
 			newAddr.ip6 = lastSyncedAddr[i].ip6
 		}
 		if newAddr.ip4 != lastSyncedAddr[i].ip4 || newAddr.ip6 != lastSyncedAddr[i].ip6 {
-			err := SendUpdate(cfg.Servers[0], newAddr)
+			err := sendUpdate(cfg.Servers[0], newAddr)
 			if err == nil {
 				lastSyncedAddr[i] = newAddr
 				log.Println("IP address update successful.")
@@ -243,7 +243,7 @@ func Update(cfg Config, lastSyncedAddr []Addresses) bool {
 	return success
 }
 
-func LoadConfig(filename string) (Config, error) {
+func loadConfig(filename string) (Config, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return Config{}, err
@@ -269,13 +269,13 @@ func main() {
 	flag.Parse()
 
 	log.Printf("Reading %s\n", configFilename)
-	cfg, err := LoadConfig(configFilename)
+	cfg, err := loadConfig(configFilename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	lastSyncedAddr := make([]Addresses, len(cfg.Servers))
-	if !Update(cfg, lastSyncedAddr) {
+	if !update(cfg, lastSyncedAddr) {
 		log.Fatal("Update failed. Exiting.")
 	}
 
@@ -286,9 +286,9 @@ func main() {
 		for {
 			select {
 			case <-netlinkAddrUpdate:
-				Update(cfg, lastSyncedAddr)
+				update(cfg, lastSyncedAddr)
 			case <-ticker.C:
-				Update(cfg, lastSyncedAddr)
+				update(cfg, lastSyncedAddr)
 			}
 		}
 	}()
