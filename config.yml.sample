@@ -1,9 +1,22 @@
+# Configure the source that is used to retreive IP addresses. Valid values:
+# - igd: Internet Gateway Device Protocol
+# - dev: Network device
 ip4provider: igd
 ip6provider: dev
+
+# 'igd' provider: URL of the IGD enabled device. Use the following URL for AVM Fritzbox:
 igdAddress: http://fritz.box:49000/igdupnp/control/WANIPConn1
+
+# 'dev' provider: Network device. dynduc takes the first public, non-temporary IP address.
 devName: eth0
+
+# Delay in seconds until the IP address providers are queried for new values. Note that the 'dev' provider in addition reacts to IP address update events sent by the kernel.
 pollInterval: 300
+
+# Array of URLs for which a GET request should be sent whenever the IP address changes.
+# <ipaddr> and <ip6addr> and will be replaced by the actual IP address.
 servers:
  - url: https://example.com/dyndns?ip=<ipaddr>&ip6=<ip6addr>"
    username: joe
    password: secret
+   # password_file: /home/joe/dyndns_password
