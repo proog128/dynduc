@@ -15,8 +15,13 @@ pollInterval: 300
 
 # Array of URLs for which a GET request should be sent whenever the IP address changes.
 # <ipaddr> and <ip6addr> and will be replaced by the actual IP address.
+# The HTTP status code determines success or failure. In addition, the response
+# can be checked via regular expressions. If the response matches 'successRegex',
+# the update succeeded. If the response matches 'failRegex', the update failed.
 servers:
  - url: https://example.com/dyndns?ip=<ipaddr>&ip6=<ip6addr>"
    username: joe
    password: secret
-   # password_file: /home/joe/dyndns_password
+   # passwordFile: /home/joe/dyndns_password
+   successRegex: ^(nochg|good).*(nochg|good).*
+   # failRegex: .*err.*

@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -138,7 +139,9 @@ type Server struct {
 	URL          string `yaml:"url"`
 	Username     string `yaml:"username"`
 	Password     string `yaml:"password"`
-	PasswordFile string `yaml:"password_file"`
+	PasswordFile string `yaml:"passwordFile"`
+	SuccessRegex string `yaml:"successRegex"`
+	FailRegex    string `yaml:"failRegex"`
 }
 
 type Config struct {
@@ -181,9 +184,42 @@ func sendUpdate(srv Server, addr Addresses) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("failed to update IP address. HTTP status: %s", resp.Status)
+		return fmt.Errorf("GET request returned an error. HTTP status: %s", resp.Status)
+	}
+
+	if srv.SuccessRegex != "" {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		matched, err := regexp.Match(srv.SuccessRegex, body)
+		if err != nil {
+			return err
+		}
+
+		if !matched {
+			return fmt.Errorf("response does not match successRegex, got '%s'", body)
+		}
+	}
+
+	if srv.FailRegex != "" {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		matched, err := regexp.Match(srv.FailRegex, body)
+		if err != nil {
+			return err
+		}
+
+		if matched {
+			return fmt.Errorf("response matches failRegex, got '%s'", body)
+		}
 	}
 
 	return nil
@@ -232,7 +268,7 @@ func update(cfg Config, lastSyncedAddr []Addresses) bool {
 			err := sendUpdate(cfg.Servers[0], newAddr)
 			if err == nil {
 				lastSyncedAddr[i] = newAddr
-				log.Println("IP address update successful.")
+				log.Println("IP address update successful. New address:", newAddr.ip4, newAddr.ip6)
 			} else {
 				log.Println("Failed to update address:", err)
 				success = false
